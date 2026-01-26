@@ -1,0 +1,70 @@
+{
+  "name": "md-view",
+  "displayName": "MD View",
+  "description": "Markdown preview with TOC navigation and image paste support",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.70.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onLanguage:markdown"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "md-view.openPreview",
+        "title": "MD View: 打开预览",
+        "icon": "$(open-preview)"
+      },
+      {
+        "command": "md-view.smartPaste",
+        "title": "MD View: 智能粘贴"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "when": "resourceLangId == markdown",
+          "command": "md-view.openPreview",
+          "group": "navigation"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "md-view.openPreview",
+        "key": "ctrl+shift+m",
+        "mac": "cmd+shift+m",
+        "when": "resourceLangId == markdown"
+      },
+      {
+        "command": "md-view.smartPaste",
+        "key": "ctrl+alt+v",
+        "mac": "cmd+alt+v",
+        "when": "resourceLangId == markdown && editorTextFocus"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.10",
+    "@types/node": "22.x",
+    "@types/vscode": "^1.70.0",
+    "@vscode/test-cli": "^0.0.12",
+    "@vscode/test-electron": "^2.5.2",
+    "eslint": "^9.39.2",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.52.0"
+  }
+}
