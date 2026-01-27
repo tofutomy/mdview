@@ -1,6 +1,7 @@
 # MD View - Markdown 预览插件
 
-一个 VS Code Markdown 预览插件，支持目录导航和图片粘贴功能。AI开发
+一个 VS Code Markdown 预览插件，支持目录导航和图片粘贴功能。
+![image](images/image-2026-01-27T01-16-15-029Z.png)
 
 ## ✨ 功能特性
 
