@@ -9,6 +9,11 @@ let isUpdatingFromWebview = false;
 // 防止循环滚动同步的标志
 let isScrollingSyncFromPreview = false;
 let scrollSyncLockTimeout: NodeJS.Timeout | undefined;
+// 滚动同步开关
+let scrollSyncEnabled = true;
+// 正在编辑的标志，编辑时不触发滚动同步
+let isEditing = false;
+let editingTimeout: NodeJS.Timeout | undefined;
 
 export function activate(context: vscode.ExtensionContext) {
     console.log('MD View extension is now active!');
@@ -37,6 +42,15 @@ export function activate(context: vscode.ExtensionContext) {
     // 监听文档变化，实时更新预览
     const onDocumentChange = vscode.workspace.onDidChangeTextDocument((e) => {
         if (currentPanel && e.document.languageId === 'markdown' && !isUpdatingFromWebview) {
+            // 设置编辑标志，防止输入时触发滚动同步
+            isEditing = true;
+            if (editingTimeout) {
+                clearTimeout(editingTimeout);
+            }
+            editingTimeout = setTimeout(() => {
+                isEditing = false;
+            }, 500);
+            
             updatePreview(e.document, currentPanel);
         }
     });
@@ -59,6 +73,14 @@ export function activate(context: vscode.ExtensionContext) {
     const onVisibleRangeChange = vscode.window.onDidChangeTextEditorVisibleRanges((e) => {
         // 如果是从预览区同步过来的滚动，跳过
         if (isScrollingSyncFromPreview) {
+            return;
+        }
+        // 如果滚动同步被禁用，跳过
+        if (!scrollSyncEnabled) {
+            return;
+        }
+        // 如果正在编辑，跳过（避免输入时视图跳动）
+        if (isEditing) {
             return;
         }
         if (currentPanel && e.textEditor.document.languageId === 'markdown') {
@@ -135,8 +157,10 @@ function openPreviewPanel(context: vscode.ExtensionContext, document: vscode.Tex
                 }
             } else if (message.command === 'scrollEditorToLine') {
                 // 预览区滚动时同步编辑器位置
-                const editor = vscode.window.activeTextEditor;
-                if (editor && currentDocument && editor.document === currentDocument) {
+                if (!scrollSyncEnabled) {
+                    return;
+                }
+                if (currentEditor && currentDocument && currentEditor.document === currentDocument) {
                     // 设置标志防止循环同步
                     isScrollingSyncFromPreview = true;
                     if (scrollSyncLockTimeout) {
@@ -145,7 +169,7 @@ function openPreviewPanel(context: vscode.ExtensionContext, document: vscode.Tex
                     
                     const line = message.line;
                     const range = new vscode.Range(line, 0, line, 0);
-                    editor.revealRange(range, vscode.TextEditorRevealType.AtTop);
+                    currentEditor.revealRange(range, vscode.TextEditorRevealType.AtTop);
                     
                     // 500ms 后解除锁定
                     scrollSyncLockTimeout = setTimeout(() => {
@@ -205,6 +229,9 @@ function openPreviewPanel(context: vscode.ExtensionContext, document: vscode.Tex
                         });
                     }
                 }
+            } else if (message.command === 'setScrollSync') {
+                // 设置滚动同步状态
+                scrollSyncEnabled = message.enabled;
             }
         },
         undefined,
@@ -758,6 +785,22 @@ function getWebviewContent(html: string, toc: TocItem[], rawContent: string, doc
             background: var(--vscode-editor-findMatchHighlightBackground);
             animation: fadeOut 2s forwards;
         }
+        /* 滚动同步复选框样式 */
+        .sync-checkbox-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 12px;
+            color: var(--vscode-foreground);
+            cursor: pointer;
+            user-select: none;
+        }
+        .sync-checkbox-wrapper input[type="checkbox"] {
+            width: 14px;
+            height: 14px;
+            cursor: pointer;
+            accent-color: var(--vscode-button-background);
+        }
         @keyframes fadeOut {
             from { background: var(--vscode-editor-findMatchHighlightBackground); }
             to { background: transparent; }
@@ -779,6 +822,10 @@ function getWebviewContent(html: string, toc: TocItem[], rawContent: string, doc
     <div class="main-area">
         <div class="toolbar">
             <button id="insertImageBtn" onclick="insertImage()">📷 插入图片</button>
+            <label class="sync-checkbox-wrapper">
+                <input type="checkbox" id="scrollSyncCheckbox" checked onchange="toggleScrollSync(this.checked)">
+                <span>滚动同步</span>
+            </label>
             <span style="margin-left: auto; font-size: 12px; color: var(--vscode-descriptionForeground);">
                 点击插入图片
             </span>
@@ -798,8 +845,15 @@ function getWebviewContent(html: string, toc: TocItem[], rawContent: string, doc
         const vscode = acquireVsCodeApi();
         let editorContent = \`${escapedContent}\`;
         let tocData = ${tocJson};
+        let scrollSyncEnabled = true;
         
         const previewDiv = document.getElementById('preview');
+
+        // 切换滚动同步
+        function toggleScrollSync(enabled) {
+            scrollSyncEnabled = enabled;
+            vscode.postMessage({ command: 'setScrollSync', enabled: enabled });
+        }
 
         // 目录折叠功能
         function toggleToc(event, toggleEl) {
@@ -898,8 +952,10 @@ function getWebviewContent(html: string, toc: TocItem[], rawContent: string, doc
         // 监听预览区滚动，同步到编辑器
         let scrollSyncTimeout;
         previewDiv.addEventListener('scroll', () => {
+            if (!scrollSyncEnabled) return;
             clearTimeout(scrollSyncTimeout);
             scrollSyncTimeout = setTimeout(() => {
+                if (!scrollSyncEnabled) return;
                 // 找到当前可见区域顶部附近的元素
                 const elements = previewDiv.querySelectorAll('[data-line]');
                 const scrollTop = previewDiv.scrollTop;
@@ -926,8 +982,10 @@ function getWebviewContent(html: string, toc: TocItem[], rawContent: string, doc
             const message = event.data;
             if (message.command === 'syncScroll') {
                 // 从 VS Code 编辑器同步滚动位置
-                const line = message.line;
-                syncScrollToLine(line);
+                if (scrollSyncEnabled) {
+                    const line = message.line;
+                    syncScrollToLine(line);
+                }
             } else if (message.command === 'scrollToInsertedImage') {
                 // 滚动到新插入的图片位置
                 setTimeout(() => {
@@ -1058,13 +1116,14 @@ function getWebviewContent(html: string, toc: TocItem[], rawContent: string, doc
 // 检查剪贴板是否有图片
 async function checkClipboardHasImage(): Promise<boolean> {
     return new Promise((resolve) => {
-        const { exec } = require('child_process');
+        const { execFile } = require('child_process');
         const script = `
-            Add-Type -AssemblyName System.Windows.Forms
-            $image = [System.Windows.Forms.Clipboard]::GetImage()
-            if ($image -ne $null) { Write-Output "HAS_IMAGE" } else { Write-Output "NO_IMAGE" }
-        `;
-        exec(`powershell -Command "${script.replace(/"/g, '\\"').replace(/\n/g, ' ')}"`,
+Add-Type -AssemblyName System.Windows.Forms
+$image = [System.Windows.Forms.Clipboard]::GetImage()
+if ($image -ne $null) { Write-Output 'HAS_IMAGE' } else { Write-Output 'NO_IMAGE' }
+`;
+        execFile('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', script],
+            { encoding: 'utf8' },
             (error: Error | null, stdout: string) => {
                 resolve(stdout.trim() === 'HAS_IMAGE');
             }

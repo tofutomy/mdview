@@ -1,13 +1,31 @@
 {
   "name": "md-view",
   "displayName": "MD View",
-  "description": "Markdown preview with TOC navigation and image paste support",
-  "version": "0.0.1",
+  "description": "Markdown preview with TOC navigation and image paste support / Markdown 预览插件，支持目录导航和图片粘贴",
+  "version": "0.0.3",
+  "publisher": "sikilab",
+  "icon": "icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sikilab/mdview"
+  },
+  "galleryBanner": {
+    "color": "#1e1e1e",
+    "theme": "dark"
+  },
   "engines": {
     "vscode": "^1.70.0"
   },
   "categories": [
-    "Other"
+    "Other",
+    "Visualization"
+  ],
+  "keywords": [
+    "markdown",
+    "preview",
+    "toc",
+    "image",
+    "paste"
   ],
   "activationEvents": [
     "onLanguage:markdown"
@@ -43,8 +61,8 @@
       },
       {
         "command": "md-view.smartPaste",
-        "key": "ctrl+alt+v",
-        "mac": "cmd+alt+v",
+        "key": "ctrl+shift+alt+v",
+        "mac": "cmd+shift+alt+v",
         "when": "resourceLangId == markdown && editorTextFocus"
       }
     ]

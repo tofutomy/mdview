@@ -1,6 +1,6 @@
 # MD View - Markdown 预览插件
 
-一个 VS Code Markdown 预览插件，支持目录导航和图片粘贴功能。
+一个 VS Code Markdown 预览插件，支持目录导航和图片粘贴功能。AI开发
 
 ## ✨ 功能特性
 
@@ -26,8 +26,8 @@
 ### 粘贴图片
 1. 复制图片到剪贴板（截图或复制图片文件）
 2. 在 Markdown 编辑器中：
-   - **快捷键**: `Ctrl+Alt+V` (Mac: `Cmd+Alt+V`)
-   - **右键菜单**: 选择 "MD View: 粘贴图片"
+   - **快捷键**: `Ctrl+shift+Alt+V` (Mac: `Cmd+shift+Alt+V`)
+   - **按钮点击**: 点击预览区的“插入图片”按钮
 3. 图片将自动保存到 `images` 目录并插入引用
 
 ## 📁 目录结构
@@ -47,7 +47,7 @@ images/
 | 功能 | Windows/Linux | Mac |
 |------|---------------|-----|
 | 打开预览 | `Ctrl+Shift+V` | `Cmd+Shift+V` |
-| 粘贴图片 | `Ctrl+Alt+V` | `Cmd+Alt+V` |
+| 粘贴图片 | `Ctrl+shift+Alt+V` | `Cmd+shift+Alt+V` |
 
 ## 🔧 开发
 
