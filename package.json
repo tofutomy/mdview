@@ -2,7 +2,7 @@
   "name": "md-view",
   "displayName": "MD View",
   "description": "Markdown preview with TOC navigation and image paste support / Markdown 预览插件，支持目录导航和图片粘贴",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "publisher": "sikilab",
   "icon": "icon.png",
   "repository": {

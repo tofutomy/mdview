@@ -6,9 +6,9 @@ let currentPanel: vscode.WebviewPanel | undefined = undefined;
 let currentDocument: vscode.TextDocument | undefined = undefined;
 let currentEditor: vscode.TextEditor | undefined = undefined;
 let isUpdatingFromWebview = false;
-// 防止循环滚动同步的标志
-let isScrollingSyncFromPreview = false;
-let scrollSyncLockTimeout: NodeJS.Timeout | undefined;
+// 预览区驱动编辑器滚动时，临时忽略编辑器可见区域变化，避免循环同步
+let isSyncingEditorFromPreview = false;
+let editorSyncLockTimeout: NodeJS.Timeout | undefined;
 // 滚动同步开关
 let scrollSyncEnabled = true;
 // 正在编辑的标志，编辑时不触发滚动同步
@@ -72,7 +72,7 @@ export function activate(context: vscode.ExtensionContext) {
     
     const onVisibleRangeChange = vscode.window.onDidChangeTextEditorVisibleRanges((e) => {
         // 如果是从预览区同步过来的滚动，跳过
-        if (isScrollingSyncFromPreview) {
+        if (isSyncingEditorFromPreview) {
             return;
         }
         // 如果滚动同步被禁用，跳过
@@ -86,18 +86,18 @@ export function activate(context: vscode.ExtensionContext) {
         if (currentPanel && e.textEditor.document.languageId === 'markdown') {
             if (e.visibleRanges.length > 0) {
                 const topLine = e.visibleRanges[0].start.line;
-                // 只有当可见行变化超过2行时才同步，避免输入时的微小变化触发滚动
-                if (Math.abs(topLine - lastVisibleLine) > 2) {
+                // 只要顶部可见行发生变化就同步，保证编辑区小幅滚动时预览区也能跟随
+                if (topLine !== lastVisibleLine) {
                     lastVisibleLine = topLine;
-                    // 防抖：300ms 内不重复触发
+                    // 防抖：降低滚动事件频率，同时保持跟手
                     if (scrollSyncTimeout) {
                         clearTimeout(scrollSyncTimeout);
                     }
                     scrollSyncTimeout = setTimeout(() => {
-                        if (currentPanel) {
+                        if (currentPanel && !isSyncingEditorFromPreview) {
                             currentPanel.webview.postMessage({ command: 'syncScroll', line: topLine });
                         }
-                    }, 150);
+                    }, 80);
                 }
             }
         }
@@ -140,6 +140,8 @@ function openPreviewPanel(context: vscode.ExtensionContext, document: vscode.Tex
     currentPanel.onDidDispose(() => {
         currentPanel = undefined;
         currentDocument = undefined;
+        currentEditor = undefined;
+        clearEditorSyncLock();
         isFirstLoad = true;
     }, null, context.subscriptions);
 
@@ -152,6 +154,7 @@ function openPreviewPanel(context: vscode.ExtensionContext, document: vscode.Tex
                     const line = message.line;
                     const range = new vscode.Range(line, 0, line, 0);
                     // 使用InCenterIfOutsideViewport让标题显示在可视区上半部分
+                    lockEditorSyncFromPreview();
                     editor.revealRange(range, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
                     editor.selection = new vscode.Selection(line, 0, line, 0);
                 }
@@ -162,19 +165,11 @@ function openPreviewPanel(context: vscode.ExtensionContext, document: vscode.Tex
                 }
                 if (currentEditor && currentDocument && currentEditor.document === currentDocument) {
                     // 设置标志防止循环同步
-                    isScrollingSyncFromPreview = true;
-                    if (scrollSyncLockTimeout) {
-                        clearTimeout(scrollSyncLockTimeout);
-                    }
+                    lockEditorSyncFromPreview();
                     
                     const line = message.line;
                     const range = new vscode.Range(line, 0, line, 0);
                     currentEditor.revealRange(range, vscode.TextEditorRevealType.AtTop);
-                    
-                    // 500ms 后解除锁定
-                    scrollSyncLockTimeout = setTimeout(() => {
-                        isScrollingSyncFromPreview = false;
-                    }, 500);
                 }
             } else if (message.command === 'insertImageAtCursor') {
                 // 插入图片按钮点击
@@ -239,6 +234,25 @@ function openPreviewPanel(context: vscode.ExtensionContext, document: vscode.Tex
     );
 
     updatePreview(document, currentPanel);
+}
+
+function lockEditorSyncFromPreview() {
+    isSyncingEditorFromPreview = true;
+    if (editorSyncLockTimeout) {
+        clearTimeout(editorSyncLockTimeout);
+    }
+    editorSyncLockTimeout = setTimeout(() => {
+        isSyncingEditorFromPreview = false;
+        editorSyncLockTimeout = undefined;
+    }, 450);
+}
+
+function clearEditorSyncLock() {
+    if (editorSyncLockTimeout) {
+        clearTimeout(editorSyncLockTimeout);
+        editorSyncLockTimeout = undefined;
+    }
+    isSyncingEditorFromPreview = false;
 }
 
 let isFirstLoad = true;
@@ -846,8 +860,27 @@ function getWebviewContent(html: string, toc: TocItem[], rawContent: string, doc
         let editorContent = \`${escapedContent}\`;
         let tocData = ${tocJson};
         let scrollSyncEnabled = true;
+        let isSyncingPreviewFromEditor = false;
+        let previewSyncUnlockTimer = undefined;
+        let lastPreviewSyncedLine = -1;
+        let lastEditorSyncedLine = -1;
         
         const previewDiv = document.getElementById('preview');
+
+        function lockPreviewSyncFromEditor() {
+            isSyncingPreviewFromEditor = true;
+            clearTimeout(previewSyncUnlockTimer);
+            previewSyncUnlockTimer = setTimeout(() => {
+                isSyncingPreviewFromEditor = false;
+            }, 500);
+        }
+
+        function keepPreviewSyncLockedUntilScrollSettles() {
+            clearTimeout(previewSyncUnlockTimer);
+            previewSyncUnlockTimer = setTimeout(() => {
+                isSyncingPreviewFromEditor = false;
+            }, 300);
+        }
 
         // 切换滚动同步
         function toggleScrollSync(enabled) {
@@ -953,9 +986,15 @@ function getWebviewContent(html: string, toc: TocItem[], rawContent: string, doc
         let scrollSyncTimeout;
         previewDiv.addEventListener('scroll', () => {
             if (!scrollSyncEnabled) return;
+            if (isSyncingPreviewFromEditor) {
+                clearTimeout(scrollSyncTimeout);
+                keepPreviewSyncLockedUntilScrollSettles();
+                return;
+            }
             clearTimeout(scrollSyncTimeout);
             scrollSyncTimeout = setTimeout(() => {
                 if (!scrollSyncEnabled) return;
+                if (isSyncingPreviewFromEditor) return;
                 // 找到当前可见区域顶部附近的元素
                 const elements = previewDiv.querySelectorAll('[data-line]');
                 const scrollTop = previewDiv.scrollTop;
@@ -972,9 +1011,12 @@ function getWebviewContent(html: string, toc: TocItem[], rawContent: string, doc
                 
                 if (closestElement) {
                     const line = parseInt(closestElement.getAttribute('data-line'));
-                    vscode.postMessage({ command: 'scrollEditorToLine', line: line });
+                    if (!Number.isNaN(line) && line !== lastEditorSyncedLine) {
+                        lastEditorSyncedLine = line;
+                        vscode.postMessage({ command: 'scrollEditorToLine', line: line });
+                    }
                 }
-            }, 150);
+            }, 80);
         });
 
         // 监听来自扩展的消息
@@ -984,7 +1026,10 @@ function getWebviewContent(html: string, toc: TocItem[], rawContent: string, doc
                 // 从 VS Code 编辑器同步滚动位置
                 if (scrollSyncEnabled) {
                     const line = message.line;
-                    syncScrollToLine(line);
+                    if (line !== lastPreviewSyncedLine) {
+                        lastPreviewSyncedLine = line;
+                        syncScrollToLine(line);
+                    }
                 }
             } else if (message.command === 'scrollToInsertedImage') {
                 // 滚动到新插入的图片位置
@@ -1091,23 +1136,14 @@ function getWebviewContent(html: string, toc: TocItem[], rawContent: string, doc
             
             if (closestElement) {
                 const elementTop = closestElement.offsetTop;
+                lastEditorSyncedLine = targetLine;
+                lockPreviewSyncFromEditor();
                 container.scrollTo({
                     top: elementTop - 50,
-                    behavior: 'smooth'
+                    behavior: 'auto'
                 });
             }
         }
-
-        // 快捷键
-        editorTextarea.addEventListener('keydown', (e) => {
-            if (e.ctrlKey && e.key === 's') {
-                e.preventDefault();
-                if (editorTextarea.value !== editorContent) {
-                    editorContent = editorTextarea.value;
-                    vscode.postMessage({ command: 'updateContent', content: editorContent });
-                }
-            }
-        });
     </script>
 </body>
 </html>`;
