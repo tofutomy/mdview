@@ -39,6 +39,19 @@ export function activate(context: vscode.ExtensionContext) {
         await smartPaste(editor);
     });
 
+    const insertImageFromFileCommand = vscode.commands.registerCommand('md-view.insertImageFromFile', async () => {
+        const editor = vscode.window.activeTextEditor;
+        if (!editor || editor.document.languageId !== 'markdown') {
+            vscode.window.showWarningMessage('请先打开一个 Markdown 文件');
+            return;
+        }
+        const result = await insertImageFromFileAndGetMarkdown(editor.document);
+        if (!result) {
+            return;
+        }
+        await insertMarkdownAtCursorAndRefreshPreview(editor, editor.document, result.markdown);
+    });
+
     // 监听文档变化，实时更新预览
     const onDocumentChange = vscode.workspace.onDidChangeTextDocument((e) => {
         if (currentPanel && e.document.languageId === 'markdown' && !isUpdatingFromWebview) {
@@ -106,6 +119,7 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(
         openPreviewCommand,
         smartPasteCommand,
+        insertImageFromFileCommand,
         onDocumentChange,
         onEditorChange,
         onVisibleRangeChange
@@ -172,26 +186,19 @@ function openPreviewPanel(context: vscode.ExtensionContext, document: vscode.Tex
                     currentEditor.revealRange(range, vscode.TextEditorRevealType.AtTop);
                 }
             } else if (message.command === 'insertImageAtCursor') {
-                // 插入图片按钮点击
                 if (currentDocument && currentEditor) {
                     const result = await pasteImageAndGetMarkdown(currentDocument);
                     if (result) {
-                        // 使用保存的编辑器引用和光标位置
-                        const position = currentEditor.selection.active;
-                        const insertLine = position.line;
-                        const success = await currentEditor.edit(editBuilder => {
-                            editBuilder.insert(position, result.markdown);
-                        });
-                        if (success) {
-                            // 刷新预览
-                            if (currentPanel) {
-                                updatePreview(currentDocument, currentPanel);
-                                // 滚动预览区到插入的图片位置
-                                setTimeout(() => {
-                                    currentPanel?.webview.postMessage({ command: 'scrollToInsertedImage', line: insertLine });
-                                }, 100);
-                            }
-                        }
+                        await insertMarkdownAtCursorAndRefreshPreview(currentEditor, currentDocument, result.markdown);
+                    }
+                } else {
+                    vscode.window.showWarningMessage('请先在编辑器中点击光标位置');
+                }
+            } else if (message.command === 'insertImageFromFileAtCursor') {
+                if (currentDocument && currentEditor) {
+                    const result = await insertImageFromFileAndGetMarkdown(currentDocument);
+                    if (result) {
+                        await insertMarkdownAtCursorAndRefreshPreview(currentEditor, currentDocument, result.markdown);
                     }
                 } else {
                     vscode.window.showWarningMessage('请先在编辑器中点击光标位置');
@@ -835,13 +842,14 @@ function getWebviewContent(html: string, toc: TocItem[], rawContent: string, doc
     </div>
     <div class="main-area">
         <div class="toolbar">
-            <button id="insertImageBtn" onclick="insertImage()">📷 插入图片</button>
+            <button id="insertImageBtn" onclick="insertImage()">📷 粘贴图片</button>
+            <button id="insertImageFromFileBtn" onclick="insertImageFromFile()">🖼 插入图片</button>
             <label class="sync-checkbox-wrapper">
                 <input type="checkbox" id="scrollSyncCheckbox" checked onchange="toggleScrollSync(this.checked)">
                 <span>滚动同步</span>
             </label>
             <span style="margin-left: auto; font-size: 12px; color: var(--vscode-descriptionForeground);">
-                点击插入图片
+                粘贴剪贴板｜本机选图插入
             </span>
         </div>
         <div class="content-area">
@@ -914,9 +922,12 @@ function getWebviewContent(html: string, toc: TocItem[], rawContent: string, doc
         }
         initTocHeights();
 
-        // 插入图片
         function insertImage() {
             vscode.postMessage({ command: 'insertImageAtCursor' });
+        }
+
+        function insertImageFromFile() {
+            vscode.postMessage({ command: 'insertImageFromFileAtCursor' });
         }
 
         // 图片查看大图功能
@@ -1147,6 +1158,106 @@ function getWebviewContent(html: string, toc: TocItem[], rawContent: string, doc
     </script>
 </body>
 </html>`;
+}
+
+async function insertMarkdownAtCursorAndRefreshPreview(
+    editor: vscode.TextEditor,
+    document: vscode.TextDocument,
+    markdown: string
+): Promise<boolean> {
+    const position = editor.selection.active;
+    const insertLine = position.line;
+    const success = await editor.edit((editBuilder) => {
+        editBuilder.insert(position, markdown);
+    });
+    if (success && currentPanel && currentDocument === document) {
+        updatePreview(document, currentPanel);
+        setTimeout(() => {
+            currentPanel?.webview.postMessage({ command: 'scrollToInsertedImage', line: insertLine });
+        }, 100);
+    }
+    return success;
+}
+
+async function insertImageFromFileAndGetMarkdown(
+    document: vscode.TextDocument
+): Promise<{ markdown: string } | null> {
+    if (document.uri.scheme !== 'file') {
+        vscode.window.showWarningMessage('请先保存 Markdown 文件到本地后再插入图片');
+        return null;
+    }
+    const docDir = path.dirname(document.uri.fsPath);
+    const imagesDir = path.join(docDir, 'images');
+    const uris = await vscode.window.showOpenDialog({
+        canSelectMany: true,
+        openLabel: '插入',
+        defaultUri: vscode.Uri.file(docDir),
+        filters: {
+            图片: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'ico']
+        }
+    });
+    if (!uris?.length) {
+        return null;
+    }
+
+    const resolvedDocDir = path.resolve(docDir);
+    const resolvedImagesDir = path.resolve(imagesDir);
+    const baseStamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const lines: string[] = [];
+    const errors: string[] = [];
+
+    for (let i = 0; i < uris.length; i++) {
+        const srcPath = uris[i].fsPath;
+        try {
+            const resolvedSrc = path.resolve(srcPath);
+            const relUnderImages = path.relative(resolvedImagesDir, resolvedSrc);
+            const alreadyInDocumentImages =
+                relUnderImages !== '' &&
+                !relUnderImages.startsWith('..') &&
+                !path.isAbsolute(relUnderImages);
+
+            if (alreadyInDocumentImages) {
+                const relativePath = path.relative(resolvedDocDir, resolvedSrc).replace(/\\/g, '/');
+                if (relativePath.startsWith('..') || !relativePath) {
+                    errors.push(`${path.basename(srcPath)}: 无法计算相对路径`);
+                    continue;
+                }
+                lines.push(`![image](${relativePath})`);
+            } else {
+                if (!fs.existsSync(imagesDir)) {
+                    fs.mkdirSync(imagesDir, { recursive: true });
+                }
+                const ext = path.extname(srcPath) || '.png';
+                const destName = `image-${baseStamp}-${i}${ext}`;
+                const destPath = path.join(imagesDir, destName);
+                await fs.promises.copyFile(srcPath, destPath);
+                const relativePath = `images/${destName}`.replace(/\\/g, '/');
+                lines.push(`![image](${relativePath})`);
+            }
+        } catch (error) {
+            errors.push(`${path.basename(srcPath)}: ${(error as Error).message}`);
+        }
+    }
+
+    if (lines.length === 0) {
+        if (errors.length > 0) {
+            vscode.window.showErrorMessage(
+                `插入图片失败: ${errors[0]}${errors.length > 1 ? `（共 ${errors.length} 个错误）` : ''}`
+            );
+        }
+        return null;
+    }
+
+    const markdown = lines.join('\n');
+    if (errors.length > 0) {
+        vscode.window.showWarningMessage(`已插入 ${lines.length} 张，${errors.length} 张失败`);
+    } else if (lines.length === 1) {
+        vscode.window.showInformationMessage('已插入 1 张图片');
+    } else {
+        vscode.window.showInformationMessage(`已插入 ${lines.length} 张图片`);
+    }
+
+    return { markdown };
 }
 
 // 检查剪贴板是否有图片

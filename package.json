@@ -2,7 +2,7 @@
   "name": "md-view",
   "displayName": "MD View",
   "description": "Markdown preview with TOC navigation and image paste support / Markdown 预览插件，支持目录导航和图片粘贴",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "publisher": "sikilab",
   "icon": "icon.png",
   "repository": {
@@ -41,6 +41,10 @@
       {
         "command": "md-view.smartPaste",
         "title": "MD View: 智能粘贴"
+      },
+      {
+        "command": "md-view.insertImageFromFile",
+        "title": "MD View: 插入图片"
       }
     ],
     "menus": {

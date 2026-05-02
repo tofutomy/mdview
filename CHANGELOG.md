@@ -6,7 +6,11 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## [Unreleased]
 
-- Initial release
+## [0.0.7]
+
+- 支持从本机选择图片插入：命令「MD View: 插入图片」与预览工具栏「插入图片」；文件复制到文档同级 `images` 并插入 Markdown 引用。
+- 若所选文件已在该文档的 `images` 目录下（含子目录），则不再复制，仅插入引用。
+- 支持在文件对话框中一次多选多张图片，按选择顺序每张一行插入。
 
 ## [0.0.6]
 
