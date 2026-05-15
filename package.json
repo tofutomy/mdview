@@ -1,7 +1,7 @@
 {
   "name": "md-view",
   "displayName": "MD View",
-  "description": "在侧边栏显示 Markdown 标题大纲，支持预览模式下导航",
+  "description": "在 Markdown 预览中显示标题大纲导航",
   "version": "0.0.8",
   "publisher": "sikilab",
   "icon": "icon.png",
@@ -31,38 +31,12 @@
   ],
   "main": "./out/extension.js",
   "contributes": {
-    "views": {
-      "explorer": [
-        {
-          "id": "mdViewOutline",
-          "name": "Markdown 大纲",
-          "type": "webview"
-        }
-      ]
-    },
-    "commands": [
-      {
-        "command": "md-view.refreshOutline",
-        "title": "刷新大纲",
-        "icon": "$(refresh)"
-      }
+    "markdown.markdownItPlugins": true,
+    "markdown.previewScripts": [
+      "./media/preview.js"
     ],
-    "menus": {
-      "view/title": [
-        {
-          "command": "md-view.refreshOutline",
-          "when": "view == mdViewOutline",
-          "group": "navigation"
-        }
-      ]
-    },
-    "keybindings": [
-      {
-        "command": "md-view.refreshOutline",
-        "key": "ctrl+shift+m",
-        "mac": "cmd+shift+m",
-        "when": "resourceLangId == markdown"
-      }
+    "markdown.previewStyles": [
+      "./media/preview.css"
     ]
   },
   "scripts": {
