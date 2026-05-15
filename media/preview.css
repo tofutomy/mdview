@@ -154,12 +154,12 @@
     line-height: 15px;
 }
 
-.md-view-badge.lv1 { background: var(--vscode-charts-red); color: #fff; }
+.md-view-badge.lv1 { background:  #b95454; color: #fff; }
 .md-view-badge.lv2 { background: var(--vscode-charts-orange); color: #fff; }
-.md-view-badge.lv3 { background: var(--vscode-charts-yellow); color: var(--vscode-editor-background); }
-.md-view-badge.lv4 { background: var(--vscode-charts-green); color: #fff; }
-.md-view-badge.lv5 { background: var(--vscode-charts-blue); color: #fff; }
-.md-view-badge.lv6 { background: var(--vscode-charts-purple); color: #fff; }
+.md-view-badge.lv3 { background: #b9b07d; color: var(--vscode-editor-background); }
+.md-view-badge.lv4 { background: #8aa089; color: #fff; }
+.md-view-badge.lv5 { background: #8c96ac; color: #fff; }
+.md-view-badge.lv6 { background: #998695; color: #fff; }
 
 .md-view-text {
     flex: 1;

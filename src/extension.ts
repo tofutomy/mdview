@@ -31,7 +31,7 @@ export function activate(_context: vscode.ExtensionContext) {
             const render = md.renderer.render.bind(md.renderer);
 
             md.renderer.render = function (tokens: any[], options: any, env: any) {
-                const headings: { level: number; text: string; id: string }[] = [];
+                const headings: { level: number; text: string; id: string; line: number }[] = [];
                 const seenIds = new Set<string>();
 
                 for (let i = 0; i < tokens.length; i++) {
@@ -44,6 +44,9 @@ export function activate(_context: vscode.ExtensionContext) {
                     const inlineToken = tokens[i + 1];
                     const text = extractInlineText(inlineToken);
                     if (!text) { continue; }
+
+                    const line = (token.map && token.map[0]) ? token.map[0] : i;
+                    try { token.attrSet('data-mdv-line', String(line)); } catch (_e) { /* ignore */ }
 
                     let id = '';
                     try { id = token.attrGet('id') || ''; } catch (_e) { /* ignore */ }
@@ -59,7 +62,7 @@ export function activate(_context: vscode.ExtensionContext) {
                         try { token.attrSet('id', id); } catch (_e) { /* ignore */ }
                     }
                     seenIds.add(id);
-                    headings.push({ level, text, id });
+                    headings.push({ level, text, id, line });
                 }
 
                 const html = render(tokens, options, env);

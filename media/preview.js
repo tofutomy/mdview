@@ -8,8 +8,8 @@
     var collapsedItems = {};
     var panelVisible = true;
     var currentOutline = null;
-    var activeId = null;
-    var scrollActiveId = null;
+    var activeLine = -1;
+    var scrollActiveLine = -1;
     var scrollTimer = null;
     var initRun = false;
 
@@ -167,8 +167,8 @@
             tree.innerHTML = '<div style="padding:12px;color:var(--vscode-descriptionForeground);font-size:11px;">\u6ca1\u6709\u6807\u9898</div>';
             if (footer) { footer.textContent = '0 \u4e2a\u6807\u9898'; }
             currentOutline = null;
-            activeId = null;
-            scrollActiveId = null;
+            activeLine = -1;
+            scrollActiveLine = -1;
             return;
         }
 
@@ -182,8 +182,8 @@
         renderTree(outlineTree, tree);
         if (footer) { footer.textContent = items.length + ' \u4e2a\u6807\u9898'; }
 
-        activeId = null;
-        scrollActiveId = null;
+        activeLine = -1;
+        scrollActiveLine = -1;
         setTimeout(updateScrollActive, 200);
     }
 
@@ -193,8 +193,8 @@
         if (tree) { tree.innerHTML = ''; }
         if (footer) { footer.textContent = '\u8bf7\u6253\u5f00 Markdown \u6587\u4ef6'; }
         currentOutline = null;
-        activeId = null;
-        scrollActiveId = null;
+        activeLine = -1;
+        scrollActiveLine = -1;
     }
 
     function buildTree(items) {
@@ -231,7 +231,7 @@
         var collapsed = collapsedItems[item.id] === true;
 
         var html = '<div class="md-view-item">';
-        html += '<div class="md-view-item-row" data-id="' + escAttr(item.id) + '">';
+        html += '<div class="md-view-item-row" data-line="' + item.line + '">';
         html += '<span class="md-view-toggle ' + (hasChildren ? '' : 'leaf') + '" data-action="toggle" data-id="' + escAttr(item.id) + '">' + (hasChildren ? (collapsed ? '\u25B6' : '\u25BC') : '') + '</span>';
         html += '<span class="md-view-badge lv' + item.level + '">' + escHtml(item.prefix) + '</span>';
         html += '<span class="md-view-text">' + escHtml(item.text) + '</span>';
@@ -260,9 +260,11 @@
 
         var row = target.closest('.md-view-item-row');
         if (row) {
-            var headingId = row.getAttribute('data-id');
-            scrollToHeading(headingId);
-            setActive(headingId);
+            var line = parseInt(row.getAttribute('data-line'), 10);
+            if (!isNaN(line)) {
+                scrollToHeading(line);
+                setActive(line);
+            }
         }
     }
 
@@ -274,40 +276,39 @@
             var tree = document.getElementById('md-view-outline-tree');
             if (tree) {
                 renderTree(currentOutline.outline, tree);
-                if (activeId) {
-                    var row = document.querySelector('#md-view-outline-tree .md-view-item-row[data-id="' + CSS.escape(activeId) + '"]');
+                if (activeLine >= 0) {
+                    var row = document.querySelector('#md-view-outline-tree .md-view-item-row[data-line="' + activeLine + '"]');
                     if (row) { row.classList.add('active'); }
                 }
-                if (scrollActiveId) {
-                    var sr = document.querySelector('#md-view-outline-tree .md-view-item-row[data-id="' + CSS.escape(scrollActiveId) + '"]');
+                if (scrollActiveLine >= 0) {
+                    var sr = document.querySelector('#md-view-outline-tree .md-view-item-row[data-line="' + scrollActiveLine + '"]');
                     if (sr) { sr.classList.add('scroll-active'); }
                 }
             }
         }
     }
 
-    function scrollToHeading(id) {
-        if (!id) { return; }
-        var el = document.getElementById(id);
+    function scrollToHeading(line) {
+        var el = document.querySelector('[data-mdv-line="' + line + '"]');
         if (el) {
             el.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
     }
 
-    function setActive(id) {
-        if (activeId === id) { return; }
+    function setActive(line) {
+        if (activeLine === line) { return; }
 
         var tree = document.getElementById('md-view-outline-tree');
         if (!tree) { return; }
 
-        if (activeId) {
-            var old = tree.querySelector('.md-view-item-row[data-id="' + CSS.escape(activeId) + '"]');
+        if (activeLine >= 0) {
+            var old = tree.querySelector('.md-view-item-row[data-line="' + activeLine + '"]');
             if (old) { old.classList.remove('active'); }
         }
-        activeId = id;
-        scrollActiveId = null;
+        activeLine = line;
+        scrollActiveLine = -1;
 
-        var row = tree.querySelector('.md-view-item-row[data-id="' + CSS.escape(id) + '"]');
+        var row = tree.querySelector('.md-view-item-row[data-line="' + line + '"]');
         if (row) {
             row.classList.remove('scroll-active');
             row.classList.add('active');
@@ -325,7 +326,7 @@
         var closestDist = Infinity;
 
         for (var i = 0; i < headings.length; i++) {
-            var el = document.getElementById(headings[i].id);
+            var el = document.querySelector('[data-mdv-line="' + headings[i].line + '"]');
             if (!el) { continue; }
             var rect = el.getBoundingClientRect();
             var top = rect.top + viewportTop;
@@ -340,27 +341,27 @@
 
         if (!closest) { return; }
 
-        if (closest.id === activeId) {
-            if (scrollActiveId) {
-                var sr = document.querySelector('#md-view-outline-tree .md-view-item-row[data-id="' + CSS.escape(scrollActiveId) + '"]');
+        if (closest.line === activeLine) {
+            if (scrollActiveLine >= 0) {
+                var sr = document.querySelector('#md-view-outline-tree .md-view-item-row[data-line="' + scrollActiveLine + '"]');
                 if (sr) { sr.classList.remove('scroll-active'); }
-                scrollActiveId = null;
+                scrollActiveLine = -1;
             }
             return;
         }
 
-        if (scrollActiveId === closest.id) { return; }
+        if (scrollActiveLine === closest.line) { return; }
 
         var tree = document.getElementById('md-view-outline-tree');
         if (!tree) { return; }
 
-        if (scrollActiveId) {
-            var old = tree.querySelector('.md-view-item-row[data-id="' + CSS.escape(scrollActiveId) + '"]');
+        if (scrollActiveLine >= 0) {
+            var old = tree.querySelector('.md-view-item-row[data-line="' + scrollActiveLine + '"]');
             if (old) { old.classList.remove('scroll-active'); }
         }
-        scrollActiveId = closest.id;
+        scrollActiveLine = closest.line;
 
-        var row = tree.querySelector('.md-view-item-row[data-id="' + CSS.escape(closest.id) + '"]');
+        var row = tree.querySelector('.md-view-item-row[data-line="' + closest.line + '"]');
         if (row && !row.classList.contains('active')) {
             row.classList.add('scroll-active');
         }
