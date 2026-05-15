@@ -1,8 +1,8 @@
 {
   "name": "md-view",
   "displayName": "MD View",
-  "description": "Markdown preview with TOC navigation and image paste support / Markdown 预览插件，支持目录导航和图片粘贴",
-  "version": "0.0.7",
+  "description": "在侧边栏显示 Markdown 标题大纲，支持预览模式下导航",
+  "version": "0.0.8",
   "publisher": "sikilab",
   "icon": "icon.png",
   "repository": {
@@ -22,52 +22,46 @@
   ],
   "keywords": [
     "markdown",
-    "preview",
+    "outline",
     "toc",
-    "image",
-    "paste"
+    "navigation"
   ],
   "activationEvents": [
     "onLanguage:markdown"
   ],
   "main": "./out/extension.js",
   "contributes": {
+    "views": {
+      "explorer": [
+        {
+          "id": "mdViewOutline",
+          "name": "Markdown 大纲",
+          "type": "webview"
+        }
+      ]
+    },
     "commands": [
       {
-        "command": "md-view.openPreview",
-        "title": "MD View: 打开预览",
-        "icon": "$(open-preview)"
-      },
-      {
-        "command": "md-view.smartPaste",
-        "title": "MD View: 智能粘贴"
-      },
-      {
-        "command": "md-view.insertImageFromFile",
-        "title": "MD View: 插入图片"
+        "command": "md-view.refreshOutline",
+        "title": "刷新大纲",
+        "icon": "$(refresh)"
       }
     ],
     "menus": {
-      "editor/title": [
+      "view/title": [
         {
-          "when": "resourceLangId == markdown",
-          "command": "md-view.openPreview",
+          "command": "md-view.refreshOutline",
+          "when": "view == mdViewOutline",
           "group": "navigation"
         }
       ]
     },
     "keybindings": [
       {
-        "command": "md-view.openPreview",
+        "command": "md-view.refreshOutline",
         "key": "ctrl+shift+m",
         "mac": "cmd+shift+m",
         "when": "resourceLangId == markdown"
-      },
-      {
-        "command": "md-view.smartPaste",
-        "key": "ctrl+shift+alt+v",
-        "mac": "cmd+shift+alt+v",
-        "when": "resourceLangId == markdown && editorTextFocus"
       }
     ]
   },
