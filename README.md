@@ -1,76 +1,46 @@
-# MD View - Markdown 预览插件
+# Markdown Preview Outline
 
-一个 VS Code Markdown 预览插件，支持目录导航和图片粘贴功能。
+在 VS Code 内置 Markdown 预览中显示标题大纲，支持层级折叠、双向跟随、点击跳转。
 
-![image](images/image-2026-05-02T13-41-32-080Z-eb70c5.png)
+## 功能
 
-## ✨ 功能特性
+- **预览内嵌大纲**：打开 Markdown 预览（`Ctrl+Shift+V` / `Ctrl+K V`），左侧自动显示大纲面板
+- **层级树**：H1-H6 标题按层级缩进，可折叠展开
+- **点击跳转**：点击大纲项，预览平滑滚动到对应标题
+- **双向跟随**：滚动预览时大纲自动高亮当前可见标题；点击大纲高亮当前项
+- **面板开关**：左上角 ☰ 按钮切换面板显隐，状态自动记忆
 
-### 1. Markdown 预览带目录导航
-- 打开 Markdown 文件后，可以直接查看渲染后的内容
-- 左侧显示文档目录（TOC），自动提取所有标题
-- 点击目录项可以快速定位到对应位置
-- 实时同步：编辑文档时预览自动更新
-- 优化双向滚动同步：编辑区和预览区可以互相跟随定位，减少同步抖动
+## 使用
 
-### 2. 图片：粘贴与本机插入
-- **粘贴图片**：剪贴板图片保存到文档同级 `images/` 并插入引用（预览区「粘贴图片」或智能粘贴快捷键）
-- **插入图片**：命令面板「MD View: 插入图片」或预览区「插入图片」；支持**一次多选**多张，按选择顺序每张一行插入；已在 `images/` 下的文件只引用不复制，其余复制到 `images/`（`image-<时间戳>-<序号>.扩展名`）
-- 预览中可直接浏览本地图片
+1. 打开 `.md` 文件
+2. `Ctrl+Shift+V` 打开内置预览
+3. 左侧 ☰ 展开大纲面板，点击标题导航
 
-## 🚀 使用方法
-
-### 打开预览
-- **快捷键**: `Ctrl+Shift+V` (Mac: `Cmd+Shift+V`)
-- **命令面板**: 输入 "MD View: 打开预览"
-- **编辑器标题栏**: 点击预览图标
-
-### 粘贴图片（剪贴板）
-1. 复制图片到剪贴板（截图或复制图片）
-2. 在 Markdown 编辑器中：
-   - **快捷键**: `Ctrl+shift+Alt+V` (Mac: `Cmd+shift+Alt+V`)
-   - **按钮点击**: 预览区「粘贴图片」
-3. 图片保存为 `images/image-<时间戳>.png` 并插入引用
-
-### 插入图片（本机文件，可多选）
-1. 光标放在插入位置；Markdown 须已保存到本地
-2. 执行「MD View: 插入图片」或预览区「插入图片」
-3. 在系统文件对话框中按住 **Ctrl**（macOS 为 **Cmd**）多选若干图片；确定后按顺序插入，每张一行
-
-## 📁 目录结构
-
-粘贴图片后，会自动创建以下结构：
-
-```
-your-document.md
-images/
-  ├── image-2026-01-26T10-30-00-000Z.png
-  ├── image-2026-01-26T10-35-00-000Z.png
-  └── ...
-```
-
-## ⌨️ 快捷键
+## 快捷键
 
 | 功能 | Windows/Linux | Mac |
 |------|---------------|-----|
-| 打开预览 | `Ctrl+Shift+V` | `Cmd+Shift+V` |
-| 粘贴图片 | `Ctrl+shift+Alt+V` | `Cmd+shift+Alt+V` |
+| 内置预览 | `Ctrl+Shift+V` | `Cmd+Shift+V` |
+| 侧边预览 | `Ctrl+K V` | `Cmd+K V` |
 
-## 🔧 开发
+## 技术实现
+
+通过三个 VS Code 贡献点注入到内置预览：
+
+- `markdown.markdownItPlugins` — 收集标题数据并嵌入 HTML
+- `markdown.previewScripts` — 注入 JS 渲染大纲面板
+- `markdown.previewStyles` — 注入 CSS 样式
+
+## 开发
 
 ```bash
-# 安装依赖
 npm install
-
-# 编译
-npm run compile
-
-# 监听模式
-npm run watch
+npm run compile   # 编译
+npm run watch     # 监听模式
 ```
 
-按 `F5` 启动调试，将打开一个新的 VS Code 窗口来测试插件。
+按 `F5` 启动调试。
 
-## 📝 License
+## License
 
 MIT

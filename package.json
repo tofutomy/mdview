@@ -1,8 +1,8 @@
 {
-  "name": "md-view",
-  "displayName": "MD View",
-  "description": "在 Markdown 预览中显示标题大纲导航",
-  "version": "0.0.8",
+  "name": "markdown-preview-outline",
+  "displayName": "Markdown Preview Outline",
+  "description": "在 VS Code 内置 Markdown 预览中显示标题大纲导航",
+  "version": "1.0.0",
   "publisher": "sikilab",
   "icon": "icon.png",
   "repository": {
